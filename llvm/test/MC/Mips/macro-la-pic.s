@@ -274,6 +274,16 @@ la $2,$str2
 # N32:      lw      $2, %got_disp($str2)($gp)     # encoding: [0x8f,0x82,A,A]
 # N32-NEXT:                           #   fixup A - offset: 0, value: %got_disp($str2), kind: fixup_Mips_GOT_DISP
 
+la $2,forward_label
+# O32:      lw      $2, %got(forward_label)($gp)  # encoding: [0x8f,0x82,A,A]
+# O32-NEXT:                           #   fixup A - offset: 0, value: %got(forward_label), kind: fixup_Mips_GOT
+# O32-NEXT: addiu   $2, $2, %lo(forward_label)    # encoding: [0x24,0x42,A,A]
+# O32-NEXT:                           #   fixup A - offset: 0, value: %lo(forward_label), kind: fixup_Mips_LO16
+
+# N32:      lw      $2, %got_disp(forward_label)($gp) # encoding: [0x8f,0x82,A,A]
+# N32-NEXT:                           #   fixup A - offset: 0, value: %got_disp(forward_label), kind: fixup_Mips_GOT_DISP
+
 .rodata
 .Lstr: .4byte 0
 $str2: .4byte 0
+forward_label: .4byte 0
