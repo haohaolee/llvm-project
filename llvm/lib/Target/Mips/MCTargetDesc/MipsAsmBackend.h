@@ -39,6 +39,9 @@ public:
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;
 
+  std::optional<bool> evaluateFixup(const MCFragment &, MCFixup &,
+                                    MCValue &, uint64_t &) override;
+
   void applyFixup(const MCFragment &, const MCFixup &, const MCValue &Target,
                   uint8_t *Data, uint64_t Value, bool IsResolved) override;
 

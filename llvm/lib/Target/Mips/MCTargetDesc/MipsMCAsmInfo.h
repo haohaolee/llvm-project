@@ -65,6 +65,7 @@ enum {
   S_HIGHER,
   S_HIGHEST,
   S_LO,
+  S_LO_IF_LOCAL,
   S_NEG,
   S_PCREL_HI16,
   S_PCREL_LO16,

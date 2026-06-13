@@ -133,6 +133,9 @@ static void printImpl(const MCAsmInfo &MAI, raw_ostream &OS,
   case Mips::S_LO:
     OS << "%lo";
     break;
+  case Mips::S_LO_IF_LOCAL:
+    OS << "%lo_if_local";
+    break;
   case Mips::S_NEG:
     OS << "%neg";
     break;

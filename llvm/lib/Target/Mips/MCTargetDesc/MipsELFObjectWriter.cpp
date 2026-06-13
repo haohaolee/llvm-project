@@ -251,6 +251,7 @@ unsigned MipsELFObjectWriter::getRelocType(const MCFixup &Fixup,
   case Mips::fixup_Mips_HI16:
     return ELF::R_MIPS_HI16;
   case Mips::fixup_Mips_LO16:
+  case Mips::fixup_Mips_LO16_IF_LOCAL:
     return ELF::R_MIPS_LO16;
   case Mips::fixup_Mips_TLSGD:
     return ELF::R_MIPS_TLS_GD;

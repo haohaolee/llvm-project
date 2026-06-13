@@ -2966,6 +2966,11 @@ bool MipsAsmParser::loadAndAddSymbolAddress(const MCExpr *SymExpr,
     // manually.
     if (ABI.IsO32() && Res.getAddSym()->getName().starts_with(".L"))
       IsLocalSym = true;
+    bool IsExplicitNonLocalSym =
+        getContext().isELF() &&
+        static_cast<const MCSymbolELF *>(Res.getAddSym())->isBindingSet() &&
+        static_cast<const MCSymbolELF *>(Res.getAddSym())->getBinding() !=
+            ELF::STB_LOCAL;
     bool UseXGOT = STI->hasFeature(Mips::FeatureXGOT) && !IsLocalSym;
 
     // The case where the result register is $25 is somewhat special. If the
@@ -3083,6 +3088,12 @@ bool MipsAsmParser::loadAndAddSymbolAddress(const MCExpr *SymExpr,
       if (IsLocalSym) {
         GotExpr = MCSpecifierExpr::create(SymExpr, Mips::S_GOT, getContext());
         LoExpr = MCSpecifierExpr::create(SymExpr, Mips::S_LO, getContext());
+      } else if (!inMicroMipsMode() && !IsExplicitNonLocalSym &&
+                 Res.getAddSym()->isUndefined() && Res.getConstant() == 0) {
+        GotExpr =
+            MCSpecifierExpr::create(Res.getAddSym(), Mips::S_GOT, getContext());
+        LoExpr = MCSpecifierExpr::create(SymExpr, Mips::S_LO_IF_LOCAL,
+                                         getContext());
       } else {
         // External symbols fully resolve the symbol with just the %got(symbol)
         // but we must still account for any offset to the symbol for

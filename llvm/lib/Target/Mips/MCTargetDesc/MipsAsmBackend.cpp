@@ -16,12 +16,14 @@
 #include "MCTargetDesc/MipsFixupKinds.h"
 #include "MCTargetDesc/MipsMCTargetDesc.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -42,6 +44,7 @@ static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
     return 0;
   case FK_Data_2:
   case Mips::fixup_Mips_LO16:
+  case Mips::fixup_Mips_LO16_IF_LOCAL:
   case Mips::fixup_Mips_GPREL16:
   case Mips::fixup_Mips_GPOFF_HI:
   case Mips::fixup_Mips_GPOFF_LO:
@@ -219,6 +222,29 @@ static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
 std::unique_ptr<MCObjectTargetWriter>
 MipsAsmBackend::createObjectTargetWriter() const {
   return createMipsELFObjectWriter(TheTriple, IsN32);
+}
+
+std::optional<bool> MipsAsmBackend::evaluateFixup(const MCFragment &,
+                                                  MCFixup &Fixup,
+                                                  MCValue &Target,
+                                                  uint64_t &Value) {
+  if (Fixup.getKind() != Mips::fixup_Mips_LO16_IF_LOCAL)
+    return {};
+
+  Value = Target.getConstant();
+  const MCSymbol *Sym = Target.getAddSym();
+  if (!Sym || !Sym->isInSection() || !getContext().isELF()) {
+    Value = 0;
+    return true;
+  }
+
+  const auto *ELFSym = static_cast<const MCSymbolELF *>(Sym);
+  if (ELFSym->getBinding() != ELF::STB_LOCAL) {
+    Value = 0;
+    return true;
+  }
+
+  return false;
 }
 
 // Little-endian fixup data byte ordering:
@@ -408,6 +434,7 @@ MCFixupKindInfo MipsAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
     { "fixup_Mips_26",           0,     26,   0 },
     { "fixup_Mips_HI16",         0,     16,   0 },
     { "fixup_Mips_LO16",         0,     16,   0 },
+    { "fixup_Mips_LO16_IF_LOCAL", 0,    16,   0 },
     { "fixup_Mips_AnyImm16",     0,     16,   0 },
     { "fixup_Mips_GPREL16",      0,     16,   0 },
     { "fixup_Mips_LITERAL",      0,     16,   0 },
@@ -494,6 +521,7 @@ MCFixupKindInfo MipsAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
     { "fixup_Mips_26",           6,     26,   0 },
     { "fixup_Mips_HI16",        16,     16,   0 },
     { "fixup_Mips_LO16",        16,     16,   0 },
+    { "fixup_Mips_LO16_IF_LOCAL",16,     16,   0 },
     { "fixup_Mips_AnyImm16",    16,     16,   0 },
     { "fixup_Mips_GPREL16",     16,     16,   0 },
     { "fixup_Mips_LITERAL",     16,     16,   0 },

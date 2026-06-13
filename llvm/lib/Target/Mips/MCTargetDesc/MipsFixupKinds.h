@@ -46,6 +46,9 @@ enum Fixups {
   // Pure lower 16 bit fixup resulting in - R_MIPS_LO16.
   fixup_Mips_LO16,
 
+  // Lower 16 bit fixup resulting in R_MIPS_LO16 only when the symbol is local.
+  fixup_Mips_LO16_IF_LOCAL,
+
   // 16-bit fixup that must be resolved.
   fixup_Mips_AnyImm16,
 

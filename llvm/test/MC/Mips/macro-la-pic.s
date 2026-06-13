@@ -20,6 +20,8 @@
 la $5, symbol
 # O32: lw $5, %got(symbol)($gp)    # encoding: [0x8f,0x85,A,A]
 # O32:                             #   fixup A - offset: 0, value: %got(symbol), kind: fixup_Mips_GOT
+# O32: addiu $5, $5, %lo_if_local(symbol){{ *}}# encoding: [0x24,0xa5,A,A]
+# O32:                             #   fixup A - offset: 0, value: %lo_if_local(symbol), kind: fixup_Mips_LO16_IF_LOCAL
 
 # XGOT: lui  $5, %got_hi(symbol)      # encoding: [0x3c,0x05,A,A]
 # XGOT:                               #   fixup A - offset: 0, value: %got_hi(symbol), kind: fixup_Mips_GOT_HI16
@@ -33,6 +35,8 @@ la $5, symbol
 la $5, symbol($6)
 # O32: lw $5, %got(symbol)($gp)    # encoding: [0x8f,0x85,A,A]
 # O32:                             #   fixup A - offset: 0, value: %got(symbol), kind: fixup_Mips_GOT
+# O32: addiu $5, $5, %lo_if_local(symbol){{ *}}# encoding: [0x24,0xa5,A,A]
+# O32:                             #   fixup A - offset: 0, value: %lo_if_local(symbol), kind: fixup_Mips_LO16_IF_LOCAL
 # O32: addu $5, $5, $6             # encoding: [0x00,0xa6,0x28,0x21]
 
 # XGOT: lui  $5, %got_hi(symbol)      # encoding: [0x3c,0x05,A,A]
@@ -49,6 +53,8 @@ la $5, symbol($6)
 la $6, symbol($6)
 # O32: lw $1, %got(symbol)($gp)    # encoding: [0x8f,0x81,A,A]
 # O32:                             #   fixup A - offset: 0, value: %got(symbol), kind: fixup_Mips_GOT
+# O32: addiu $1, $1, %lo_if_local(symbol){{ *}}# encoding: [0x24,0x21,A,A]
+# O32:                             #   fixup A - offset: 0, value: %lo_if_local(symbol), kind: fixup_Mips_LO16_IF_LOCAL
 # O32: addu $6, $1, $6             # encoding: [0x00,0x26,0x30,0x21]
 
 # XGOT: lui  $1, %got_hi(symbol)      # encoding: [0x3c,0x01,A,A]
@@ -277,8 +283,8 @@ la $2,$str2
 la $2,forward_label
 # O32:      lw      $2, %got(forward_label)($gp)  # encoding: [0x8f,0x82,A,A]
 # O32-NEXT:                           #   fixup A - offset: 0, value: %got(forward_label), kind: fixup_Mips_GOT
-# O32-NEXT: addiu   $2, $2, %lo(forward_label)    # encoding: [0x24,0x42,A,A]
-# O32-NEXT:                           #   fixup A - offset: 0, value: %lo(forward_label), kind: fixup_Mips_LO16
+# O32-NEXT: addiu   $2, $2, %lo_if_local(forward_label){{ *}}# encoding: [0x24,0x42,A,A]
+# O32-NEXT:                           #   fixup A - offset: 0, value: %lo_if_local(forward_label), kind: fixup_Mips_LO16_IF_LOCAL
 
 # N32:      lw      $2, %got_disp(forward_label)($gp) # encoding: [0x8f,0x82,A,A]
 # N32-NEXT:                           #   fixup A - offset: 0, value: %got_disp(forward_label), kind: fixup_Mips_GOT_DISP
