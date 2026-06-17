@@ -54,7 +54,8 @@ public:
   bool fixupNeedsRelaxationAdvanced(const MCFragment &, const MCFixup &,
                                     const MCValue &, uint64_t,
                                     bool Resolved) const override;
-  void relaxInstruction(MCInst &Inst, const MCSubtargetInfo &STI) const override;
+  void relaxInstruction(MCInst &Inst,
+                        const MCSubtargetInfo &STI) const override;
 
   bool writeNopData(raw_ostream &OS, uint64_t Count,
                     const MCSubtargetInfo *STI) const override;
