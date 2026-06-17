@@ -15,14 +15,20 @@
 #include "MCTargetDesc/MipsABIInfo.h"
 #include "MCTargetDesc/MipsFixupKinds.h"
 #include "MCTargetDesc/MipsMCTargetDesc.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
+#include "llvm/MC/MCExpr.h"
+#include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
+#include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
@@ -41,6 +47,7 @@ static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
   default:
     return 0;
   case FK_Data_2:
+  case Mips::fixup_Mips_LO16_Local:
   case Mips::fixup_Mips_LO16:
   case Mips::fixup_Mips_GPREL16:
   case Mips::fixup_Mips_GPOFF_HI:
@@ -219,6 +226,64 @@ static unsigned adjustFixupValue(const MCFixup &Fixup, uint64_t Value,
 std::unique_ptr<MCObjectTargetWriter>
 MipsAsmBackend::createObjectTargetWriter() const {
   return createMipsELFObjectWriter(TheTriple, IsN32);
+}
+
+static bool isExternalO32PICLoadAddressTarget(const MCValue &Target) {
+  const MCSymbol *Symbol = Target.getAddSym();
+  if (!Symbol || Target.getSubSym())
+    return false;
+
+  const auto *Sym = static_cast<const MCSymbolELF *>(Symbol);
+  return !Sym->isTemporary() && Sym->getBinding() != ELF::STB_LOCAL;
+}
+
+static bool isLocalO32PICLoadAddressTarget(const MCValue &Target) {
+  const MCSymbol *Symbol = Target.getAddSym();
+  if (!Symbol || Target.getSubSym())
+    return false;
+
+  const auto *Sym = static_cast<const MCSymbolELF *>(Symbol);
+  return Sym->isTemporary() || Sym->getBinding() == ELF::STB_LOCAL;
+}
+
+bool MipsAsmBackend::mayNeedRelaxation(unsigned Opcode,
+                                       ArrayRef<MCOperand> Operands,
+                                       const MCSubtargetInfo &STI) const {
+  return TheTriple.isOSBinFormatELF() && Opcode == Mips::LoadAddrO32PIC;
+}
+
+bool MipsAsmBackend::fixupNeedsRelaxationAdvanced(const MCFragment &F,
+                                                  const MCFixup &Fixup,
+                                                  const MCValue &Target,
+                                                  uint64_t Value,
+                                                  bool Resolved) const {
+  if (F.getOpcode() != Mips::LoadAddrO32PIC)
+    return false;
+  if (!TheTriple.isOSBinFormatELF())
+    return false;
+  return isLocalO32PICLoadAddressTarget(Target);
+}
+
+void MipsAsmBackend::relaxInstruction(MCInst &Inst,
+                                      const MCSubtargetInfo &STI) const {
+  assert(Inst.getOpcode() == Mips::LoadAddrO32PIC &&
+         "unexpected instruction to relax");
+  Inst.setOpcode(Mips::LoadAddrO32PICLocal);
+}
+
+std::optional<bool> MipsAsmBackend::evaluateFixup(const MCFragment &F,
+                                                  MCFixup &Fixup,
+                                                  MCValue &Target,
+                                                  uint64_t &Value) {
+  if (Fixup.getKind() != Mips::fixup_Mips_LO16_Local)
+    return {};
+
+  Value += Target.getConstant();
+  if (!TheTriple.isOSBinFormatELF())
+    return true;
+  if (isExternalO32PICLoadAddressTarget(Target))
+    return true;
+  return false;
 }
 
 // Little-endian fixup data byte ordering:
@@ -408,6 +473,7 @@ MCFixupKindInfo MipsAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
     { "fixup_Mips_26",           0,     26,   0 },
     { "fixup_Mips_HI16",         0,     16,   0 },
     { "fixup_Mips_LO16",         0,     16,   0 },
+    { "fixup_Mips_LO16_Local",   0,     16,   0 },
     { "fixup_Mips_AnyImm16",     0,     16,   0 },
     { "fixup_Mips_GPREL16",      0,     16,   0 },
     { "fixup_Mips_LITERAL",      0,     16,   0 },
@@ -494,6 +560,7 @@ MCFixupKindInfo MipsAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
     { "fixup_Mips_26",           6,     26,   0 },
     { "fixup_Mips_HI16",        16,     16,   0 },
     { "fixup_Mips_LO16",        16,     16,   0 },
+    { "fixup_Mips_LO16_Local",  16,     16,   0 },
     { "fixup_Mips_AnyImm16",    16,     16,   0 },
     { "fixup_Mips_GPREL16",     16,     16,   0 },
     { "fixup_Mips_LITERAL",     16,     16,   0 },
