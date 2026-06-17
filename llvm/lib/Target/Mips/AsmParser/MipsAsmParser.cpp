@@ -234,6 +234,11 @@ class MipsAsmParser : public MCTargetAsmParser {
                                MCRegister SrcReg, bool Is32BitSym, SMLoc IDLoc,
                                MCStreamer &Out, const MCSubtargetInfo *STI);
 
+  bool emitDeferredLoadAddressO32PIC(const MCExpr *SymExpr, MCRegister DstReg,
+                                     MCRegister SrcReg, SMLoc IDLoc,
+                                     MCStreamer &Out,
+                                     const MCSubtargetInfo *STI);
+
   bool emitPartialAddress(MipsTargetStreamer &TOut, SMLoc IDLoc, MCSymbol *Sym);
 
   bool expandLoadImm(MCInst &Inst, bool Is32BitImm, SMLoc IDLoc,
@@ -2934,6 +2939,36 @@ bool MipsAsmParser::expandLoadAddress(MCRegister DstReg, MCRegister BaseReg,
                        IDLoc, Out, STI);
 }
 
+bool MipsAsmParser::emitDeferredLoadAddressO32PIC(
+    const MCExpr *SymExpr, MCRegister DstReg, MCRegister SrcReg, SMLoc IDLoc,
+    MCStreamer &Out, const MCSubtargetInfo *STI) {
+  if (!Out.isObj() || !getContext().isELF())
+    return false;
+
+  MCRegister TmpReg = DstReg;
+  bool UseSrcReg =
+      SrcReg.isValid() && SrcReg != Mips::ZERO && SrcReg != Mips::ZERO_64;
+  if (UseSrcReg &&
+      getContext().getRegisterInfo()->isSuperOrSubRegisterEq(DstReg, SrcReg)) {
+    MCRegister ATReg = getATReg(IDLoc);
+    if (!ATReg)
+      return false;
+    TmpReg = ATReg;
+  }
+
+  MCInst Inst;
+  Inst.setOpcode(Mips::LoadAddrO32PIC);
+  Inst.addOperand(MCOperand::createReg(TmpReg));
+  Inst.addOperand(MCOperand::createExpr(SymExpr));
+  Inst.setLoc(IDLoc);
+  Out.emitInstruction(Inst, *STI);
+
+  if (UseSrcReg)
+    getTargetStreamer().emitRRR(Mips::ADDu, DstReg, TmpReg, SrcReg, IDLoc, STI);
+
+  return true;
+}
+
 bool MipsAsmParser::loadAndAddSymbolAddress(const MCExpr *SymExpr,
                                             MCRegister DstReg,
                                             MCRegister SrcReg, bool Is32BitSym,
@@ -2967,6 +3002,16 @@ bool MipsAsmParser::loadAndAddSymbolAddress(const MCExpr *SymExpr,
     if (ABI.IsO32() && Res.getAddSym()->getName().starts_with(".L"))
       IsLocalSym = true;
     bool UseXGOT = STI->hasFeature(Mips::FeatureXGOT) && !IsLocalSym;
+
+    // An unresolved O32 PIC symbol may still become a local definition later.
+    // Defer the one-instruction vs two-instruction choice to MC relaxation.
+    if (ABI.IsO32() && !UseXGOT && !IsLocalSym &&
+        Res.getAddSym()->isUndefined() && DstReg != Mips::T9 &&
+        DstReg != Mips::T9_64) {
+      if (emitDeferredLoadAddressO32PIC(SymExpr, DstReg, SrcReg, IDLoc, Out,
+                                        STI))
+        return false;
+    }
 
     // The case where the result register is $25 is somewhat special. If the
     // symbol in the final relocation is external and not modified with a

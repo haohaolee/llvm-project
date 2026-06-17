@@ -133,6 +133,9 @@ static void printImpl(const MCAsmInfo &MAI, raw_ostream &OS,
   case Mips::S_LO:
     OS << "%lo";
     break;
+  case Mips::S_LO_LOCAL:
+    OS << "%lo";
+    break;
   case Mips::S_NEG:
     OS << "%neg";
     break;
@@ -165,7 +168,8 @@ static void printImpl(const MCAsmInfo &MAI, raw_ostream &OS,
 }
 
 bool Mips::isGpOff(const MCSpecifierExpr &E) {
-  if (E.getSpecifier() == Mips::S_HI || E.getSpecifier() == Mips::S_LO) {
+  if (E.getSpecifier() == Mips::S_HI || E.getSpecifier() == Mips::S_LO ||
+      E.getSpecifier() == Mips::S_LO_LOCAL) {
     if (const auto *S1 = dyn_cast<const MCSpecifierExpr>(E.getSubExpr())) {
       if (const auto *S2 = dyn_cast<const MCSpecifierExpr>(S1->getSubExpr())) {
         if (S1->getSpecifier() == Mips::S_NEG &&

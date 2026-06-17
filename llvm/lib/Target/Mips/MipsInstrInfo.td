@@ -2979,6 +2979,13 @@ class LoadAddressFromImm32<string instr_asm, Operand Od, RegisterOperand RO> :
                      !strconcat(instr_asm, "\t$rt, $imm32")> ;
 def LoadAddrImm32 : LoadAddressFromImm32<"la", i32imm, GPR32Opnd>;
 
+let isCodeGenOnly = 1, isPseudo = 1, hasNoSchedulingInfo = 1 in {
+def LoadAddrO32PIC : MipsInst<(outs GPR32Opnd:$rt), (ins i32imm:$imm32),
+                              "", [], Pseudo>;
+def LoadAddrO32PICLocal : MipsInst<(outs GPR32Opnd:$rt), (ins i32imm:$imm32),
+                                   "", [], Pseudo>;
+}
+
 def JalTwoReg : MipsAsmPseudoInst<(outs GPR32Opnd:$rd), (ins GPR32Opnd:$rs),
                       "jal\t$rd, $rs"> ;
 def JalOneReg : MipsAsmPseudoInst<(outs), (ins GPR32Opnd:$rs),

@@ -17,6 +17,7 @@
 #include "MCTargetDesc/MipsMCTargetDesc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
@@ -26,6 +27,7 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCValue.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/raw_ostream.h"
@@ -158,6 +160,50 @@ void MipsMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
                                           SmallVectorImpl<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
+  auto EmitInst = [&](unsigned Opcode, ArrayRef<MCOperand> Operands) {
+    MCInst TmpInst;
+    TmpInst.setOpcode(Opcode);
+    for (const MCOperand &Operand : Operands)
+      TmpInst.addOperand(Operand);
+    TmpInst.setLoc(MI.getLoc());
+    size_t CodeOffset = CB.size();
+    size_t FixupStart = Fixups.size();
+    encodeInstruction(TmpInst, CB, Fixups, STI);
+    for (size_t I = FixupStart, E = Fixups.size(); I != E; ++I)
+      Fixups[I].setOffset(Fixups[I].getOffset() + CodeOffset);
+  };
+
+  if (MI.getOpcode() == Mips::LoadAddrO32PIC ||
+      MI.getOpcode() == Mips::LoadAddrO32PICLocal) {
+    assert(MI.getNumOperands() == 2 && MI.getOperand(0).isReg() &&
+           MI.getOperand(1).isExpr() && "unexpected O32 PIC la pseudo");
+
+    const MCExpr *SymExpr = MI.getOperand(1).getExpr();
+    const MCSpecifierExpr *GotExpr = nullptr;
+    const MCExpr *LoExpr = nullptr;
+    if (MI.getOpcode() == Mips::LoadAddrO32PICLocal) {
+      GotExpr = MCSpecifierExpr::create(SymExpr, Mips::S_GOT, Ctx);
+      LoExpr = MCSpecifierExpr::create(SymExpr, Mips::S_LO_LOCAL, Ctx);
+    } else {
+      MCValue Res;
+      if (!SymExpr->evaluateAsRelocatable(Res, nullptr) || Res.getSubSym()) {
+        Ctx.reportError(SymExpr->getLoc(), "expected relocatable expression");
+        return;
+      }
+      GotExpr = MCSpecifierExpr::create(Res.getAddSym(), Mips::S_GOT, Ctx);
+      if (Res.getConstant() != 0)
+        LoExpr = MCConstantExpr::create(Res.getConstant(), Ctx);
+    }
+
+    MCOperand DstReg = MI.getOperand(0);
+    EmitInst(Mips::LW, {DstReg, MCOperand::createReg(Mips::GP),
+                        MCOperand::createExpr(GotExpr)});
+    if (LoExpr)
+      EmitInst(Mips::ADDiu,
+               {DstReg, DstReg, MCOperand::createExpr(LoExpr)});
+    return;
+  }
+
   // Non-pseudo instructions that get changed for direct object
   // only based on operand values.
   // If this list of instructions get much longer we will move
@@ -657,6 +703,11 @@ getExprOpValue(const MCExpr *Expr, SmallVectorImpl<MCFixup> &Fixups,
       else
         FixupKind = isMicroMips(STI) ? Mips::fixup_MICROMIPS_LO16
                                      : Mips::fixup_Mips_LO16;
+      break;
+    case Mips::S_LO_LOCAL:
+      assert(!isMicroMips(STI) &&
+             "conditional O32 PIC LO16 fixup is not used for microMIPS");
+      FixupKind = Mips::fixup_Mips_LO16_Local;
       break;
     case Mips::S_HIGHEST:
       FixupKind = isMicroMips(STI) ? Mips::fixup_MICROMIPS_HIGHEST
