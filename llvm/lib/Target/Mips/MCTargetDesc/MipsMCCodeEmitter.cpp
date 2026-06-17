@@ -199,8 +199,7 @@ void MipsMCCodeEmitter::encodeInstruction(const MCInst &MI,
     EmitInst(Mips::LW, {DstReg, MCOperand::createReg(Mips::GP),
                         MCOperand::createExpr(GotExpr)});
     if (LoExpr)
-      EmitInst(Mips::ADDiu,
-               {DstReg, DstReg, MCOperand::createExpr(LoExpr)});
+      EmitInst(Mips::ADDiu, {DstReg, DstReg, MCOperand::createExpr(LoExpr)});
     return;
   }
 

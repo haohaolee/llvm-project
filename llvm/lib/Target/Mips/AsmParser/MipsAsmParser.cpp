@@ -2939,9 +2939,11 @@ bool MipsAsmParser::expandLoadAddress(MCRegister DstReg, MCRegister BaseReg,
                        IDLoc, Out, STI);
 }
 
-bool MipsAsmParser::emitDeferredLoadAddressO32PIC(
-    const MCExpr *SymExpr, MCRegister DstReg, MCRegister SrcReg, SMLoc IDLoc,
-    MCStreamer &Out, const MCSubtargetInfo *STI) {
+bool MipsAsmParser::emitDeferredLoadAddressO32PIC(const MCExpr *SymExpr,
+                                                  MCRegister DstReg,
+                                                  MCRegister SrcReg,
+                                                  SMLoc IDLoc, MCStreamer &Out,
+                                                  const MCSubtargetInfo *STI) {
   if (!Out.isObj() || !getContext().isELF())
     return false;
 
